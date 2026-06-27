@@ -128,8 +128,9 @@ def get_image_file(image_id: str, request: Request) -> FileResponse:
 def process_image(
     image_id: str,
     request: Request,
-    max_size: Annotated[int, Query(ge=64, le=512)] = 192,
-    depth_scale: Annotated[float, Query(gt=0.01, le=2.0)] = 0.28,
+    max_size: Annotated[int, Query(ge=64, le=1024)] = 512,
+    depth_scale: Annotated[float, Query(gt=0.01, le=2.0)] = 0.5,
+    discontinuity: Annotated[float, Query(gt=0.0, le=1.0)] = 0.06,
 ) -> ProcessResponse:
     settings: Settings = request.app.state.settings
     image_path = find_image_by_id(image_id, settings.images_dir)
@@ -145,7 +146,14 @@ def process_image(
         normalized_original = normalize_original(image_path, original_path)
         depth_result = request.app.state.depth_runner.estimate_depth(normalized_original)
         depth_result.depth.save(depth_path)
-        create_depth_mesh(normalized_original, depth_path, mesh_path, max_size=max_size, depth_scale=depth_scale)
+        create_depth_mesh(
+            normalized_original,
+            depth_path,
+            mesh_path,
+            max_size=max_size,
+            depth_scale=depth_scale,
+            discontinuity=discontinuity,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -158,6 +166,7 @@ def process_image(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "depth_scale": depth_scale,
         "mesh_max_size": max_size,
+        "discontinuity": discontinuity,
     }
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
@@ -231,6 +240,7 @@ def create_depth_mesh(
     *,
     max_size: int,
     depth_scale: float,
+    discontinuity: float,
 ) -> None:
     color = Image.open(image_path).convert("RGB")
     depth = Image.open(depth_path).convert("L")
@@ -238,30 +248,46 @@ def create_depth_mesh(
     depth = depth.resize(color.size, Image.Resampling.BICUBIC)
 
     width, height = color.size
-    depth_values = np.asarray(depth, dtype=np.float32) / 255.0
-    depth_values = (depth_values - 0.5) * depth_scale
+    depth01 = np.asarray(depth, dtype=np.float32) / 255.0
+    depth_z = (depth01 - 0.5) * depth_scale
 
     aspect = width / height
     xs = np.linspace(-aspect, aspect, width, dtype=np.float32)
     ys = np.linspace(1.0, -1.0, height, dtype=np.float32)
     grid_x, grid_y = np.meshgrid(xs, ys)
 
-    vertices = np.column_stack([grid_x.ravel(), grid_y.ravel(), depth_values.ravel()])
-    faces = []
-    for y in range(height - 1):
-        for x in range(width - 1):
-            a = y * width + x
-            b = a + 1
-            c = a + width
-            d = c + 1
-            faces.append((a, c, b))
-            faces.append((b, c, d))
+    vertices = np.column_stack([grid_x.ravel(), grid_y.ravel(), depth_z.ravel()])
+
+    # Build the two triangles of every grid quad, vectorized. Corner layout:
+    #   a b
+    #   c d
+    rows, cols = np.mgrid[0 : height - 1, 0 : width - 1]
+    a = (rows * width + cols).ravel()
+    b = a + 1
+    c = a + width
+    d = c + 1
+
+    # Tear the sheet at depth discontinuities: if a quad straddles a large depth
+    # jump (foreground vs. background), its triangles would stretch into a
+    # "rubber sheet" smear. Drop those quads so layers separate cleanly. The
+    # threshold is in normalized 0..1 depth, independent of depth_scale.
+    depth_flat = depth01.ravel()
+    quad = np.stack([depth_flat[a], depth_flat[b], depth_flat[c], depth_flat[d]], axis=1)
+    keep = (quad.max(axis=1) - quad.min(axis=1)) <= discontinuity
+
+    faces = np.concatenate(
+        [
+            np.stack([a[keep], c[keep], b[keep]], axis=1),
+            np.stack([b[keep], c[keep], d[keep]], axis=1),
+        ],
+        axis=0,
+    )
 
     colors = np.asarray(color, dtype=np.uint8).reshape((-1, 3))
     alpha = np.full((colors.shape[0], 1), 255, dtype=np.uint8)
     vertex_colors = np.concatenate([colors, alpha], axis=1)
 
-    mesh = trimesh.Trimesh(vertices=vertices, faces=np.asarray(faces), vertex_colors=vertex_colors, process=False)
+    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, vertex_colors=vertex_colors, process=False)
     scene = trimesh.Scene(mesh)
     exported = scene.export(file_type="glb")
     output_path.write_bytes(exported)

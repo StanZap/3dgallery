@@ -7,5 +7,9 @@ if (!root) {
   throw new Error("Missing #app root element.");
 }
 
-new GalleryApp(root).start();
+new GalleryApp(root).start().catch((error) => {
+  root.innerHTML = `<div class="empty-state">Could not reach the backend.<br><small>${
+    error instanceof Error ? error.message : String(error)
+  }</small></div>`;
+});
 

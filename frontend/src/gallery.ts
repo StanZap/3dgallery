@@ -21,7 +21,10 @@ type ProcessResponse = {
   metadata_url: string;
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+// Empty default = same origin. Requests hit the page's host (e.g. the Quest's
+// view of 10.0.0.120:5173) and Vite proxies /api to the backend. Override with
+// VITE_API_BASE only if the backend is served elsewhere.
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 export class GalleryApp {
   private images: ImageItem[] = [];

@@ -2,10 +2,13 @@ import type { ImageItem } from "./gallery";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import {
   AmbientLight,
+  BufferGeometry,
   Clock,
   Color,
   DirectionalLight,
   Group,
+  Line,
+  LineBasicMaterial,
   Mesh,
   MeshBasicMaterial,
   PerspectiveCamera,
@@ -13,14 +16,25 @@ import {
   Scene,
   SRGBColorSpace,
   TextureLoader,
+  Vector3,
   WebGLRenderer,
+  type XRTargetRaySpace,
 } from "three";
+
+// Where the artwork sits while in immersive VR: ~2.2 m in front of the spawn
+// point, at roughly standing eye height. (Desktop preview keeps it at origin so
+// the fixed camera at z=3.2 frames it.)
+const XR_PLACEMENT = { x: 0, y: 1.5, z: -2.2 };
 
 export class Viewer3D {
   private renderer: WebGLRenderer | null = null;
   private scene: Scene | null = null;
   private camera: PerspectiveCamera | null = null;
   private model: Group | Mesh | null = null;
+  private controllers: XRTargetRaySpace[] = [];
+  // Holds the artwork so we can reposition the whole thing for XR vs. desktop
+  // without touching the model's own transform.
+  private readonly content = new Group();
   private readonly clock = new Clock();
 
   constructor(private readonly assetUrl: (path: string) => string) {}
@@ -45,6 +59,24 @@ export class Viewer3D {
     const key = new DirectionalLight(0xffffff, 1.8);
     key.position.set(1, 2, 3);
     scene.add(key);
+
+    this.content.position.set(0, 0, 0);
+    scene.add(this.content);
+
+    // Visible controller ray pointers, so the immersive scene isn't empty and
+    // the user has a sense of their hands. (Exit is the headset's Meta button.)
+    const rayGeometry = new BufferGeometry().setFromPoints([
+      new Vector3(0, 0, 0),
+      new Vector3(0, 0, -1),
+    ]);
+    this.controllers = [0, 1].map((index) => {
+      const controller = renderer.xr.getController(index);
+      const ray = new Line(rayGeometry, new LineBasicMaterial({ color: 0x6cf0ff }));
+      ray.scale.z = 5;
+      controller.add(ray);
+      scene.add(controller);
+      return controller;
+    });
 
     this.renderer = renderer;
     this.scene = scene;
@@ -73,7 +105,17 @@ export class Viewer3D {
     const session = await xr.requestSession("immersive-vr", {
       optionalFeatures: ["local-floor", "bounded-floor", "hand-tracking"],
     });
+    // local-floor puts the origin at the user's feet, so XR_PLACEMENT.y is a
+    // real-world height. Falls back to local if unsupported.
+    this.renderer.xr.setReferenceSpaceType("local-floor");
     await this.renderer.xr.setSession(session);
+
+    this.content.position.set(XR_PLACEMENT.x, XR_PLACEMENT.y, XR_PLACEMENT.z);
+    session.addEventListener(
+      "end",
+      () => this.content.position.set(0, 0, 0),
+      { once: true },
+    );
   }
 
   private loadMesh(meshPath: string): void {
@@ -82,7 +124,7 @@ export class Viewer3D {
     loader.load(this.assetUrl(meshPath), (gltf) => {
       this.model = gltf.scene;
       this.model.scale.setScalar(1.05);
-      this.scene?.add(this.model);
+      this.content.add(this.model);
     });
   }
 
@@ -93,7 +135,7 @@ export class Viewer3D {
     const geometry = new PlaneGeometry(2.3, 1.55, 1, 1);
     const material = new MeshBasicMaterial({ map: texture });
     this.model = new Mesh(geometry, material);
-    this.scene.add(this.model);
+    this.content.add(this.model);
   }
 
   private renderFrame(): void {
@@ -122,6 +164,10 @@ export class Viewer3D {
       this.renderer.setAnimationLoop(null);
       this.renderer.dispose();
     }
+    this.controllers.forEach((controller) => controller.removeFromParent());
+    this.controllers = [];
+    this.content.clear();
+    this.content.position.set(0, 0, 0);
     this.renderer = null;
     this.scene = null;
     this.camera = null;
