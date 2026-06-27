@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import os
+
+# Allow the duplicate OpenMP runtimes that DA3's dependencies bring in (see
+# da3_runner for details). Must be set before torch/DA3 are imported.
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
 import argparse
 import hashlib
 import json
-import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,6 +34,7 @@ class Settings(BaseModel):
     images_dir: Path
     processed_dir: Path
     model: str
+    device: str
     dev_depth_fallback: bool
 
 
@@ -54,6 +60,7 @@ def load_settings() -> Settings:
     images_dir = Path(os.environ.get("GALLERY_IMAGES_DIR", DEFAULT_IMAGES_DIR))
     processed_dir = Path(os.environ.get("GALLERY_PROCESSED_DIR", DEFAULT_PROCESSED_DIR))
     model = os.environ.get("GALLERY_DA3_MODEL", "depth-anything/DA3-SMALL")
+    device = os.environ.get("GALLERY_DA3_DEVICE", "auto")
     dev_depth_fallback = os.environ.get("GALLERY_DEV_DEPTH_FALLBACK", "").lower() in {
         "1",
         "true",
@@ -63,6 +70,7 @@ def load_settings() -> Settings:
         images_dir=images_dir.expanduser().resolve(),
         processed_dir=processed_dir.expanduser().resolve(),
         model=model,
+        device=device,
         dev_depth_fallback=dev_depth_fallback,
     )
 
@@ -72,6 +80,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--images-dir", type=Path)
     parser.add_argument("--processed-dir", type=Path)
     parser.add_argument("--model")
+    parser.add_argument("--device", choices=["auto", "cuda", "mps", "cpu"])
     parser.add_argument("--dev-depth-fallback", action="store_true")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
@@ -87,6 +96,7 @@ async def lifespan(app: FastAPI):
     app.state.settings = settings
     app.state.depth_runner = DepthAnything3Runner(
         settings.model,
+        device=settings.device,
         dev_depth_fallback=settings.dev_depth_fallback,
     )
     yield
@@ -143,6 +153,7 @@ def process_image(
         "id": image_id,
         "source_name": image_path.name,
         "model": depth_result.model_name,
+        "device": depth_result.device,
         "used_fallback": depth_result.used_fallback,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "depth_scale": depth_scale,
@@ -264,6 +275,8 @@ def main() -> None:
         os.environ["GALLERY_PROCESSED_DIR"] = str(args.processed_dir.expanduser().resolve())
     if args.model is not None:
         os.environ["GALLERY_DA3_MODEL"] = args.model
+    if args.device is not None:
+        os.environ["GALLERY_DA3_DEVICE"] = args.device
     if args.dev_depth_fallback:
         os.environ["GALLERY_DEV_DEPTH_FALLBACK"] = "1"
 

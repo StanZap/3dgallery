@@ -12,3 +12,5 @@ frontend/node_modules/
 frontend/dist/
 frontend/.vite/
 
+temp/
+test_da3_install/

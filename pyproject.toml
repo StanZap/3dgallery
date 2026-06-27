@@ -5,17 +5,34 @@ description = "FastAPI backend for a WebXR depth gallery."
 requires-python = ">=3.11"
 dependencies = [
   "fastapi[standard]>=0.115.0",
-  "numpy>=1.26.0",
+  # Depth Anything 3 requires numpy<2; pin here so the whole env stays compatible.
+  "numpy>=1.26.0,<2",
   "pillow>=10.4.0",
   "pydantic>=2.8.0",
   "trimesh>=4.4.0",
 ]
 
 [project.optional-dependencies]
+# Runtime support libraries that Depth Anything 3 imports. The DA3 package itself
+# is installed separately (see README) because it is not published to PyPI. On a
+# CUDA host you may additionally install `xformers` (faster attention) and `gsplat`
+# (3D Gaussian export); both are optional and guarded at import time.
 da3 = [
   "torch>=2.3.0",
   "torchvision>=0.18.0",
   "transformers>=4.44.0",
+  "huggingface-hub>=0.24.0",
+  "safetensors>=0.4.0",
+  "omegaconf>=2.3.0",
+  "einops>=0.8.0",
+  "addict>=2.4.0",
+  "evo>=1.36.0",
+  "moviepy==1.0.3",
+  "pycolmap",
+  "opencv-python>=4.10",
+  "imageio>=2.34",
+  "plyfile>=1.0",
+  "e3nn",
 ]
 
 [tool.uv]
