@@ -1,0 +1,14 @@
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+
+backend/images/*
+!backend/images/.gitkeep
+backend/processed/*
+!backend/processed/.gitkeep
+
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
