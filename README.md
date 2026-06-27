@@ -36,7 +36,7 @@ pnpm install
 Point the backend at any photo folder:
 
 ```bash
-uv run fastapi dev backend/app.py -- --images-dir /path/to/photos
+uv run python -m backend.app --images-dir /path/to/photos --reload
 ```
 
 In another terminal:
@@ -52,12 +52,18 @@ Open the frontend from your Quest browser. If testing from a headset, expose bot
 VITE_API_BASE=http://YOUR_MAC_LAN_IP:8000 pnpm dev --host 0.0.0.0
 ```
 
+You can still use FastAPI's CLI by configuring the app with environment variables:
+
+```bash
+GALLERY_IMAGES_DIR=/path/to/photos uv run fastapi dev backend/app.py
+```
+
 ## Processing Models
 
 The backend defaults to `depth-anything/DA3-SMALL`. You can change it:
 
 ```bash
-uv run fastapi dev backend/app.py -- --images-dir /path/to/photos --model depth-anything/DA3-BASE
+uv run python -m backend.app --images-dir /path/to/photos --model depth-anything/DA3-BASE --reload
 ```
 
 Processing creates:
@@ -70,4 +76,8 @@ backend/processed/<image-id>/
   metadata.json
 ```
 
-If DA3 or PyTorch is not installed yet, the backend returns a clear processing error. There is also a deterministic gradient fallback for development by starting the backend with `--dev-depth-fallback`.
+If DA3 or PyTorch is not installed yet, the backend returns a clear processing error. There is also a deterministic gradient fallback for development:
+
+```bash
+uv run python -m backend.app --images-dir /path/to/photos --dev-depth-fallback --reload
+```

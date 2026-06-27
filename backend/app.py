@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -49,24 +50,38 @@ class ProcessResponse(BaseModel):
     metadata_url: str
 
 
-def parse_args() -> Settings:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--images-dir", type=Path, default=DEFAULT_IMAGES_DIR)
-    parser.add_argument("--processed-dir", type=Path, default=DEFAULT_PROCESSED_DIR)
-    parser.add_argument("--model", default="depth-anything/DA3-SMALL")
-    parser.add_argument("--dev-depth-fallback", action="store_true")
-    args, _ = parser.parse_known_args()
+def load_settings() -> Settings:
+    images_dir = Path(os.environ.get("GALLERY_IMAGES_DIR", DEFAULT_IMAGES_DIR))
+    processed_dir = Path(os.environ.get("GALLERY_PROCESSED_DIR", DEFAULT_PROCESSED_DIR))
+    model = os.environ.get("GALLERY_DA3_MODEL", "depth-anything/DA3-SMALL")
+    dev_depth_fallback = os.environ.get("GALLERY_DEV_DEPTH_FALLBACK", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
     return Settings(
-        images_dir=args.images_dir.expanduser().resolve(),
-        processed_dir=args.processed_dir.expanduser().resolve(),
-        model=args.model,
-        dev_depth_fallback=args.dev_depth_fallback,
+        images_dir=images_dir.expanduser().resolve(),
+        processed_dir=processed_dir.expanduser().resolve(),
+        model=model,
+        dev_depth_fallback=dev_depth_fallback,
     )
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--images-dir", type=Path)
+    parser.add_argument("--processed-dir", type=Path)
+    parser.add_argument("--model")
+    parser.add_argument("--dev-depth-fallback", action="store_true")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--reload", action="store_true")
+    return parser.parse_args()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    settings = parse_args()
+    settings = load_settings()
     settings.images_dir.mkdir(parents=True, exist_ok=True)
     settings.processed_dir.mkdir(parents=True, exist_ok=True)
     app.state.settings = settings
@@ -239,3 +254,23 @@ def create_depth_mesh(
     scene = trimesh.Scene(mesh)
     exported = scene.export(file_type="glb")
     output_path.write_bytes(exported)
+
+
+def main() -> None:
+    args = parse_args()
+    if args.images_dir is not None:
+        os.environ["GALLERY_IMAGES_DIR"] = str(args.images_dir.expanduser().resolve())
+    if args.processed_dir is not None:
+        os.environ["GALLERY_PROCESSED_DIR"] = str(args.processed_dir.expanduser().resolve())
+    if args.model is not None:
+        os.environ["GALLERY_DA3_MODEL"] = args.model
+    if args.dev_depth_fallback:
+        os.environ["GALLERY_DEV_DEPTH_FALLBACK"] = "1"
+
+    import uvicorn
+
+    uvicorn.run("backend.app:app", host=args.host, port=args.port, reload=args.reload)
+
+
+if __name__ == "__main__":
+    main()
