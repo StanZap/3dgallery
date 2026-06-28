@@ -44,6 +44,7 @@ class ImageItem(BaseModel):
     width: int
     height: int
     image_url: str
+    thumbnail_url: str
     processed: bool
     mesh_url: str | None = None
     depth_url: str | None = None
@@ -124,6 +125,22 @@ def get_image_file(image_id: str, request: Request) -> FileResponse:
     return FileResponse(image_path)
 
 
+@app.get("/api/images/{image_id}/thumbnail")
+def get_image_thumbnail(
+    image_id: str,
+    request: Request,
+    size: Annotated[int, Query(ge=64, le=1024)] = 256,
+) -> FileResponse:
+    settings: Settings = request.app.state.settings
+    image_path = find_image_by_id(image_id, settings.images_dir)
+    thumb_dir = settings.processed_dir / "_thumbnails"
+    thumb_dir.mkdir(parents=True, exist_ok=True)
+    thumb_path = thumb_dir / f"{image_id}-{size}.jpg"
+    if not thumb_path.exists() or thumb_path.stat().st_mtime < image_path.stat().st_mtime:
+        create_thumbnail(image_path, thumb_path, size)
+    return FileResponse(thumb_path, media_type="image/jpeg")
+
+
 @app.post("/api/images/{image_id}/process", response_model=ProcessResponse)
 def process_image(
     image_id: str,
@@ -192,7 +209,11 @@ def get_processed_file(image_id: str, filename: str, request: Request) -> FileRe
 
 def discover_images(images_dir: Path) -> list[Path]:
     return sorted(
-        [path for path in images_dir.iterdir() if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS],
+        [
+            path
+            for path in images_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
+        ],
         key=lambda path: path.name.casefold(),
     )
 
@@ -221,6 +242,7 @@ def build_image_item(path: Path, request: Request) -> ImageItem:
         width=width,
         height=height,
         image_url=f"/api/images/{image_id}/file",
+        thumbnail_url=f"/api/images/{image_id}/thumbnail?size=256",
         processed=processed,
         mesh_url=f"/api/processed/{image_id}/mesh.glb" if processed else None,
         depth_url=f"/api/processed/{image_id}/depth.png" if processed else None,
@@ -231,6 +253,13 @@ def normalize_original(source: Path, destination: Path) -> Path:
     with Image.open(source) as image:
         image.convert("RGB").save(destination, quality=95)
     return destination
+
+
+def create_thumbnail(source: Path, destination: Path, size: int) -> None:
+    with Image.open(source) as image:
+        thumbnail = image.convert("RGB")
+        thumbnail.thumbnail((size, size), Image.Resampling.LANCZOS)
+        thumbnail.save(destination, "JPEG", quality=72, optimize=True)
 
 
 def create_depth_mesh(
@@ -287,7 +316,9 @@ def create_depth_mesh(
     alpha = np.full((colors.shape[0], 1), 255, dtype=np.uint8)
     vertex_colors = np.concatenate([colors, alpha], axis=1)
 
-    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, vertex_colors=vertex_colors, process=False)
+    mesh = trimesh.Trimesh(
+        vertices=vertices, faces=faces, vertex_colors=vertex_colors, process=False
+    )
     scene = trimesh.Scene(mesh)
     exported = scene.export(file_type="glb")
     output_path.write_bytes(exported)

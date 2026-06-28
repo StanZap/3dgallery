@@ -89,10 +89,32 @@ cd frontend
 pnpm dev
 ```
 
-Open the frontend from your Quest browser. If testing from a headset, expose both dev servers on your LAN and set `VITE_API_BASE` if the backend is not at `http://localhost:8000`:
+Open the HTTPS frontend from your Quest browser:
+
+```text
+https://YOUR_MAC_LAN_IP:5173
+```
+
+For Quest testing, you can also run the dev server with an HTTP redirect helper:
 
 ```bash
-VITE_API_BASE=http://YOUR_MAC_LAN_IP:8000 pnpm dev --host 0.0.0.0
+cd frontend
+pnpm dev:quest
+```
+
+Then either open the HTTPS URL directly, or open the redirect URL and it will forward to HTTPS:
+
+```text
+https://YOUR_MAC_LAN_IP:5173
+http://YOUR_MAC_LAN_IP:5172
+```
+
+HTTPS is required for WebXR over the LAN. The Quest browser may show a one-time warning for the self-signed development certificate; accept/continue through it.
+
+The frontend proxies `/api` to `http://localhost:8000` from the dev machine. If the backend is reachable from the dev machine at a different origin, set `BACKEND_ORIGIN` before starting Vite:
+
+```bash
+BACKEND_ORIGIN=http://YOUR_BACKEND_HOST:8000 pnpm dev:quest
 ```
 
 You can still use FastAPI's CLI by configuring the app with environment variables:

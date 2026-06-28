@@ -10,6 +10,10 @@ export function assetUrl(path: string): string {
   return `${API_BASE}${path}`;
 }
 
+export function imageThumbnailUrl(image: ImageItem): string {
+  return assetUrl(image.thumbnail_url ?? image.image_url);
+}
+
 export type Gallery = ReturnType<typeof useGallery>;
 
 export function useGallery() {
@@ -21,28 +25,37 @@ export function useGallery() {
 
   const refresh = useCallback(async () => {
     const response = await fetch(`${API_BASE}/api/images`);
-    if (!response.ok) throw new Error(`Could not load images: ${response.statusText}`);
+    if (!response.ok)
+      throw new Error(`Could not load images: ${response.statusText}`);
     const data: ImageItem[] = await response.json();
     setImages(data);
     setSelectedId((current) => current ?? data[0]?.id ?? null);
   }, []);
 
   useEffect(() => {
-    refresh().catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    refresh().catch((e) =>
+      setError(e instanceof Error ? e.message : String(e)),
+    );
   }, [refresh]);
 
   const process = useCallback(async (id: string): Promise<ImageItem> => {
     setBusy(true);
     setStatus("Generating depth and mesh…");
     try {
-      const response = await fetch(`${API_BASE}/api/images/${id}/process`, { method: "POST" });
+      const response = await fetch(`${API_BASE}/api/images/${id}/process`, {
+        method: "POST",
+      });
       if (!response.ok) {
-        const body = await response.json().catch(() => ({ detail: response.statusText }));
+        const body = await response
+          .json()
+          .catch(() => ({ detail: response.statusText }));
         throw new Error(body.detail ?? response.statusText);
       }
       const payload = await response.json();
       const updated = payload.image as ImageItem;
-      setImages((prev) => prev.map((image) => (image.id === updated.id ? updated : image)));
+      setImages((prev) =>
+        prev.map((image) => (image.id === updated.id ? updated : image)),
+      );
       setStatus("3D asset ready.");
       return updated;
     } catch (e) {
@@ -54,5 +67,15 @@ export function useGallery() {
   }, []);
 
   const selected = images.find((image) => image.id === selectedId) ?? null;
-  return { images, selected, selectedId, setSelectedId, busy, status, error, refresh, process };
+  return {
+    images,
+    selected,
+    selectedId,
+    setSelectedId,
+    busy,
+    status,
+    error,
+    refresh,
+    process,
+  };
 }

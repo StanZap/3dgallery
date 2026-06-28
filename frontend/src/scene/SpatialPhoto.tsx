@@ -2,9 +2,10 @@ import { Suspense, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGLTF, useTexture } from "@react-three/drei";
 import { useXR } from "@react-three/xr";
+import { Handle, HandleTarget } from "@react-three/handle";
 import { SRGBColorSpace, type Group } from "three";
 import type { ImageItem } from "../types";
-import { assetUrl } from "../state/useGallery";
+import { assetUrl, imageThumbnailUrl } from "../state/useGallery";
 
 // While in VR the photo sits ~2.2 m ahead at eye height; on desktop it stays at
 // the origin so the fixed camera (z=3.2) frames it. (Phase 2 swaps the inner
@@ -29,7 +30,17 @@ function FlatPreview({ url, aspect }: { url: string; aspect: number }) {
   );
 }
 
-export function SpatialPhoto({ image }: { image: ImageItem }) {
+export function SpatialPhoto({
+  image,
+  xrScale = 1,
+  xrUseMesh = false,
+  xrInteractive = false,
+}: {
+  image: ImageItem;
+  xrScale?: number;
+  xrUseMesh?: boolean;
+  xrInteractive?: boolean;
+}) {
   const session = useXR((state) => state.session);
   const group = useRef<Group>(null);
 
@@ -41,15 +52,41 @@ export function SpatialPhoto({ image }: { image: ImageItem }) {
     group.current.rotation.x = Math.sin(t * 0.45) * 0.035;
   });
 
-  return (
-    <group ref={group} position={session ? XR_POSITION : DESKTOP_POSITION}>
+  const shouldUseMesh = Boolean(image.mesh_url && (!session || xrUseMesh));
+  const content = (
+    <group ref={group}>
       <Suspense fallback={null}>
-        {image.mesh_url ? (
-          <Mesh3D url={assetUrl(image.mesh_url)} />
+        {shouldUseMesh ? (
+          <Mesh3D url={assetUrl(image.mesh_url!)} />
         ) : (
-          <FlatPreview url={assetUrl(image.image_url)} aspect={image.width / image.height} />
+          <FlatPreview
+            url={session ? imageThumbnailUrl(image) : assetUrl(image.image_url)}
+            aspect={image.width / image.height}
+          />
         )}
       </Suspense>
+    </group>
+  );
+
+  if (!session) {
+    return <group position={DESKTOP_POSITION}>{content}</group>;
+  }
+
+  if (!xrInteractive) {
+    return (
+      <group position={XR_POSITION} scale={xrScale}>
+        {content}
+      </group>
+    );
+  }
+
+  return (
+    <group position={XR_POSITION} scale={xrScale}>
+      <HandleTarget>
+        <Handle translate rotate scale={{ uniform: true }}>
+          {content}
+        </Handle>
+      </HandleTarget>
     </group>
   );
 }
