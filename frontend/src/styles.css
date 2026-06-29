@@ -331,6 +331,53 @@ button {
     color: #ff9b9b;
 }
 
+.pagination-bar {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.045);
+    color: rgba(245, 247, 251, 0.72);
+    font-size: 13px;
+}
+
+.pagination-bar strong {
+    color: #ffffff;
+}
+
+.pagination-actions,
+.pagination-bar label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.pagination-bar select {
+    min-height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: #181b22;
+    color: #ffffff;
+    padding: 0 8px;
+}
+
+.mini-command {
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.mini-command:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .browser-panel .thumb-grid {
     min-height: 0;
     overflow-y: auto;
@@ -389,16 +436,19 @@ button {
 .flat-viewer {
     display: grid;
     grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 0;
     min-width: 0;
     min-height: 0;
+    overflow: hidden;
     padding: 18px;
 }
 
 .flat-toolbar {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 18px;
+    padding-bottom: 12px;
 }
 
 .title-block {
@@ -406,11 +456,43 @@ button {
 }
 
 .title-block h1 {
-    max-width: min(58vw, 920px);
-    margin: 0;
+    display: -webkit-box;
+    max-width: min(54vw, 860px);
+    max-height: 2.3em;
+    margin: 2px 0 0;
+    overflow: hidden;
     overflow-wrap: anywhere;
-    font-size: clamp(24px, 3.4vw, 48px);
-    line-height: 1;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: clamp(22px, 2.6vw, 40px);
+    line-height: 1.08;
+}
+
+.image-meta {
+    display: block;
+    margin-top: 8px;
+    color: rgba(245, 247, 251, 0.62);
+    font-size: 13px;
+}
+
+.top-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    max-width: min(48vw, 620px);
+}
+
+.control-cluster {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.make-button {
+    min-width: 132px;
 }
 
 .primary-button,
@@ -437,6 +519,11 @@ button {
     background: rgba(255, 255, 255, 0.08);
 }
 
+.mode-toggle[aria-pressed="true"] {
+    border-color: rgba(96, 165, 250, 0.72);
+    background: rgba(59, 130, 246, 0.26);
+}
+
 .primary-button:disabled,
 .command:disabled,
 .size-slider:disabled {
@@ -461,7 +548,8 @@ button {
     display: grid;
     place-items: center;
     min-height: 0;
-    overflow: auto;
+    overflow: hidden;
+    padding: 12px 12px 88px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
     background:
@@ -480,11 +568,18 @@ button {
 
 .flat-image {
     max-width: 92%;
-    max-height: 92%;
+    max-height: calc(100% - 24px);
     object-fit: contain;
     transform-origin: center;
     transition: transform 120ms ease-out;
     user-select: none;
+}
+
+.mesh-preview {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border-radius: 16px;
 }
 
 .size-readout {
@@ -496,6 +591,87 @@ button {
     background: rgba(0, 0, 0, 0.58);
     color: rgba(255, 255, 255, 0.86);
     font-size: 13px;
+}
+
+.viewer-nav-island {
+    position: absolute;
+    left: 50%;
+    bottom: 14px;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 42px 54px minmax(132px, auto) 54px 42px;
+    align-items: center;
+    gap: 9px;
+    width: fit-content;
+    max-width: calc(100% - 28px);
+    margin: 0;
+    transform: translateX(-50%);
+    padding: 9px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    background: rgba(12, 14, 20, 0.76);
+    box-shadow: 0 18px 52px rgba(0, 0, 0, 0.34);
+    backdrop-filter: blur(18px);
+}
+
+.island-button {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.075);
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+}
+
+.primary-island-button {
+    width: 54px;
+    height: 46px;
+    background: rgba(59, 130, 246, 0.24);
+    border-color: rgba(96, 165, 250, 0.5);
+    font-size: 32px;
+}
+
+.page-button {
+    color: rgba(245, 247, 251, 0.72);
+    font-size: 21px;
+}
+
+.island-button:hover:not(:disabled),
+.island-button:focus-visible {
+    border-color: rgba(147, 197, 253, 0.75);
+    background: rgba(59, 130, 246, 0.22);
+    outline: none;
+}
+
+.island-button:disabled {
+    opacity: 0.34;
+    cursor: not-allowed;
+}
+
+.island-status {
+    display: grid;
+    gap: 2px;
+    min-width: 132px;
+    color: rgba(245, 247, 251, 0.72);
+    text-align: center;
+    white-space: nowrap;
+}
+
+.island-status strong {
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 13px;
+    font-weight: 720;
+}
+
+.island-status small {
+    color: rgba(245, 247, 251, 0.56);
+    font-size: 11px;
 }
 
 @media (max-width: 900px) {
@@ -537,15 +713,16 @@ button {
     }
 
     .flat-toolbar {
-        flex-direction: column;
+        grid-template-columns: 1fr;
     }
 
     .title-block h1 {
         max-width: 100%;
     }
 
-    .actions {
+    .top-controls {
         justify-content: flex-start;
+        max-width: 100%;
     }
 
     .size-slider {
@@ -564,22 +741,51 @@ button {
 
 @media (max-width: 560px) {
     .panel-header,
-    .flat-toolbar .actions {
+    .top-controls {
         align-items: stretch;
     }
 
-    .flat-toolbar .actions {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+    .top-controls,
+    .control-cluster {
         width: 100%;
     }
 
+    .control-cluster {
+        justify-content: stretch;
+    }
+
+    .control-cluster .command {
+        flex: 1;
+    }
+
     .size-slider {
-        grid-column: span 2;
+        flex: 2;
         width: 100%;
     }
 
     .primary-button {
-        grid-column: span 3;
+        width: 100%;
+    }
+
+    .viewer-nav-island {
+        grid-template-columns: 40px 50px minmax(112px, 1fr) 50px 40px;
+        width: calc(100% - 28px);
+        border-radius: 18px;
+        gap: 6px;
+        padding: 8px;
+    }
+
+    .island-button {
+        width: 40px;
+        height: 40px;
+    }
+
+    .primary-island-button {
+        width: 50px;
+        height: 44px;
+    }
+
+    .island-status {
+        min-width: 0;
     }
 }

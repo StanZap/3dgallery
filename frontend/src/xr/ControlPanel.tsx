@@ -81,6 +81,7 @@ export function ControlPanel({
     : selected?.processed
       ? "Remake 3D"
       : "Make 3D";
+  const selectedStatus = status?.imageId === selectedId ? status.message : "";
   const visibleImages = images.slice(0, MAX_XR_THUMBNAILS);
 
   useFrame(() => {
@@ -234,9 +235,9 @@ export function ControlPanel({
             />
           </Container>
 
-          {status ? (
+          {selectedStatus ? (
             <Text fontSize={14} color="#9aa0aa">
-              {status}
+              {selectedStatus}
             </Text>
           ) : null}
         </Root>

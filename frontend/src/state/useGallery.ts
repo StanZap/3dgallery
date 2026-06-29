@@ -20,7 +20,10 @@ export function useGallery() {
   const [images, setImages] = useState<ImageItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState<{
+    imageId: string;
+    message: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -40,7 +43,7 @@ export function useGallery() {
 
   const process = useCallback(async (id: string): Promise<ImageItem> => {
     setBusy(true);
-    setStatus("Generating depth and mesh…");
+    setStatus({ imageId: id, message: "Generating depth and mesh…" });
     try {
       const response = await fetch(`${API_BASE}/api/images/${id}/process`, {
         method: "POST",
@@ -56,10 +59,13 @@ export function useGallery() {
       setImages((prev) =>
         prev.map((image) => (image.id === updated.id ? updated : image)),
       );
-      setStatus("3D asset ready.");
+      setStatus({ imageId: id, message: "3D asset ready." });
       return updated;
     } catch (e) {
-      setStatus(e instanceof Error ? e.message : "Processing failed.");
+      setStatus({
+        imageId: id,
+        message: e instanceof Error ? e.message : "Processing failed.",
+      });
       throw e;
     } finally {
       setBusy(false);

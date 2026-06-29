@@ -78,13 +78,13 @@ The backend auto-detects the device (CUDA → MPS → CPU). Override it with
 
 ### Production-style single command
 
-From the repo root, build the frontend and serve the app plus API from FastAPI:
+From the repo root, serve the built frontend plus API from FastAPI:
 
 ```bash
-./scripts/serve-production.sh --images-dir /path/to/photos
+./serve.sh --images-dir /path/to/photos
 ```
 
-This runs `pnpm --dir frontend build` and then starts `uv run python -m backend.app` on `0.0.0.0:8000`. Open:
+This starts `uv run python -m backend.app` on `0.0.0.0:8000` and serves the existing `frontend/dist` build. Open:
 
 ```text
 http://YOUR_MAC_LAN_IP:8000
@@ -93,13 +93,19 @@ http://YOUR_MAC_LAN_IP:8000
 You can pass normal backend options through the script, for example:
 
 ```bash
-./scripts/serve-production.sh --images-dir /path/to/photos --dev-depth-fallback --port 8080
+./serve.sh --images-dir /path/to/photos --dev-depth-fallback --port 8080
+```
+
+If you want the serve command to build the frontend first, pass `--build-frontend`:
+
+```bash
+./serve.sh --build-frontend --images-dir /path/to/photos
 ```
 
 Equivalent Python-only command:
 
 ```bash
-uv run python -m backend.app --host 0.0.0.0 --port 8000 --build-frontend --images-dir /path/to/photos
+uv run python -m backend.app --host 0.0.0.0 --port 8000 --images-dir /path/to/photos
 ```
 
 ### Development
