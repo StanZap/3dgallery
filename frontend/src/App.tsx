@@ -1,9 +1,19 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { createXRStore, useXR, XR } from "@react-three/xr";
+import {
+  noEvents,
+  PointerEvents,
+  createXRStore,
+  useXR,
+  XR,
+} from "@react-three/xr";
 import type { Group } from "three";
 import { SpatialPhoto } from "./scene/SpatialPhoto";
-import { ControlPanel, type PhotoControls } from "./xr/ControlPanel";
+import {
+  ControlPanel,
+  ControlPanelLite,
+  type PhotoControls,
+} from "./xr/ControlPanel";
 import { DesktopControls } from "./ui/DesktopControls";
 import { useGallery, type Gallery } from "./state/useGallery";
 
@@ -18,13 +28,21 @@ const store = createXRStore({
 function PanelGate({
   gallery,
   photoControls,
+  xrPanel,
+  xrPanelLite,
 }: {
   gallery: Gallery;
   photoControls: PhotoControls;
+  xrPanel: boolean;
+  xrPanelLite: boolean;
 }) {
   const session = useXR((state) => state.session);
   if (!session) return null;
-  return <ControlPanel gallery={gallery} photoControls={photoControls} />;
+  if (xrPanelLite)
+    return <ControlPanelLite gallery={gallery} photoControls={photoControls} />;
+  if (xrPanel)
+    return <ControlPanel gallery={gallery} photoControls={photoControls} />;
+  return null;
 }
 
 function XRBeacon({ gallery }: { gallery: Gallery }) {
@@ -248,10 +266,12 @@ function XRExitButton() {
 export function App() {
   const gallery = useGallery();
   const [photoScale, setPhotoScale] = useState(1);
+  const [imageScale, setImageScale] = useState(1);
   const [photoRecenterKey, setPhotoRecenterKey] = useState(0);
   const [xrUseMesh, setXrUseMesh] = useState(false);
   const [safeXr, setSafeXr] = useState(true);
   const [xrPanel, setXrPanel] = useState(false);
+  const [xrPanelLite, setXrPanelLite] = useState(false);
   const [xrHandles, setXrHandles] = useState(false);
   const photoControls: PhotoControls = {
     scale: photoScale,
@@ -267,11 +287,16 @@ export function App() {
 
   return (
     <div style={{ position: "fixed", inset: 0 }}>
-      <Canvas gl={{ alpha: false }} camera={{ position: [0, 0, 3.2], fov: 45 }}>
+      <Canvas
+        events={noEvents}
+        gl={{ alpha: false }}
+        camera={{ position: [0, 0, 3.2], fov: 45 }}
+      >
         <color attach="background" args={["#101114"]} />
         <ambientLight intensity={1.2} />
         <directionalLight position={[1, 2, 3]} intensity={1.8} />
         <XR store={store}>
+          <PointerEvents />
           <XRExitButton />
           <XRSafeBoot enabled={safeXr} />
           {!safeXr ? <XRBeacon gallery={gallery} /> : null}
@@ -290,8 +315,13 @@ export function App() {
               xrInteractive={xrHandles}
             />
           ) : null}
-          {!safeXr && xrPanel ? (
-            <PanelGate gallery={gallery} photoControls={photoControls} />
+          {!safeXr && (xrPanel || xrPanelLite) ? (
+            <PanelGate
+              gallery={gallery}
+              photoControls={photoControls}
+              xrPanel={xrPanel}
+              xrPanelLite={xrPanelLite}
+            />
           ) : null}
         </XR>
       </Canvas>
@@ -302,8 +332,12 @@ export function App() {
         setSafeXr={setSafeXr}
         xrPanel={xrPanel}
         setXrPanel={setXrPanel}
+        xrPanelLite={xrPanelLite}
+        setXrPanelLite={setXrPanelLite}
         xrHandles={xrHandles}
         setXrHandles={setXrHandles}
+        imageScale={imageScale}
+        setImageScale={setImageScale}
       />
     </div>
   );

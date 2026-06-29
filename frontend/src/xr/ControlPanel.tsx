@@ -244,3 +244,78 @@ export function ControlPanel({
     </HandleTarget>
   );
 }
+
+export function ControlPanelLite({
+  gallery,
+  photoControls,
+}: {
+  gallery: Gallery;
+  photoControls: PhotoControls;
+}) {
+  const { images, selectedId, setSelectedId } = gallery;
+  const panelRef = useRef<Group>(null);
+  const camera = useThree((state) => state.camera);
+  const session = useXR((state) => state.session);
+  const selectedIndex = images.findIndex((image) => image.id === selectedId);
+
+  useFrame(() => {
+    if (!panelRef.current) return;
+    camera.getWorldDirection(forward);
+    panelRef.current.position
+      .copy(camera.position)
+      .addScaledVector(forward, 1.25);
+    panelRef.current.position.y -= 0.32;
+    panelRef.current.quaternion.copy(camera.quaternion);
+  });
+
+  const selectOffset = (offset: number) => {
+    if (images.length === 0) return;
+    const current = selectedIndex < 0 ? 0 : selectedIndex;
+    const next = (current + offset + images.length) % images.length;
+    setSelectedId(images[next].id);
+    photoControls.recenter();
+  };
+
+  return (
+    <group ref={panelRef} position={[0, 1.0, -1.25]}>
+      <Root
+        pixelSize={0.0017}
+        flexDirection="row"
+        width={620}
+        padding={14}
+        gap={10}
+        backgroundColor="#15171c"
+        borderRadius={18}
+      >
+        <PanelButton label="Exit" onClick={() => void session?.end()} />
+        <PanelButton label="‹" onClick={() => selectOffset(-1)} />
+        <PanelButton label="›" onClick={() => selectOffset(1)} />
+        <PanelButton
+          label="−"
+          onClick={() =>
+            photoControls.setScale((scale) =>
+              clampPhotoScale(scale - PHOTO_SCALE_STEP),
+            )
+          }
+        />
+        <PanelButton
+          label="+"
+          onClick={() =>
+            photoControls.setScale((scale) =>
+              clampPhotoScale(scale + PHOTO_SCALE_STEP),
+            )
+          }
+        />
+        <PanelButton
+          label="Center"
+          flexGrow={1}
+          onClick={photoControls.recenter}
+        />
+        <PanelButton
+          label={photoControls.useMesh ? "3D on" : "2D"}
+          onClick={photoControls.toggleMesh}
+        />
+      </Root>
+    </group>
+  );
+}

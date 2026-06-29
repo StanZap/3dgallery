@@ -9,6 +9,7 @@ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 import argparse
 import hashlib
 import json
+import subprocess
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,9 +26,11 @@ from pydantic import BaseModel
 from backend.da3_runner import DepthAnything3Runner
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".avif", ".bmp", ".tif", ".tiff"}
-PROJECT_ROOT = Path(__file__).resolve().parent
-DEFAULT_IMAGES_DIR = PROJECT_ROOT / "images"
-DEFAULT_PROCESSED_DIR = PROJECT_ROOT / "processed"
+BACKEND_ROOT = Path(__file__).resolve().parent
+REPO_ROOT = BACKEND_ROOT.parent
+DEFAULT_IMAGES_DIR = BACKEND_ROOT / "images"
+DEFAULT_PROCESSED_DIR = BACKEND_ROOT / "processed"
+DEFAULT_FRONTEND_DIST = REPO_ROOT / "frontend" / "dist"
 
 
 class Settings(BaseModel):
@@ -83,6 +86,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--model")
     parser.add_argument("--device", choices=["auto", "cuda", "mps", "cpu"])
     parser.add_argument("--dev-depth-fallback", action="store_true")
+    parser.add_argument(
+        "--frontend-dist",
+        type=Path,
+        default=DEFAULT_FRONTEND_DIST,
+        help="Built frontend directory to serve. Defaults to frontend/dist.",
+    )
+    parser.add_argument(
+        "--no-frontend",
+        action="store_true",
+        help="Serve only the API, without the production frontend.",
+    )
+    parser.add_argument(
+        "--build-frontend",
+        action="store_true",
+        help="Run `pnpm --dir frontend build` before starting the server.",
+    )
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--reload", action="store_true")
@@ -207,6 +226,27 @@ def get_processed_file(image_id: str, filename: str, request: Request) -> FileRe
     return FileResponse(path, media_type=media_type)
 
 
+@app.get("/{path:path}", include_in_schema=False)
+def get_frontend(path: str) -> FileResponse:
+    dist_dir = Path(os.environ.get("GALLERY_FRONTEND_DIST", DEFAULT_FRONTEND_DIST)).resolve()
+    if os.environ.get("GALLERY_NO_FRONTEND", "").lower() in {"1", "true", "yes"}:
+        raise HTTPException(status_code=404, detail="Frontend serving is disabled.")
+    if not dist_dir.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Frontend build not found. Run with --build-frontend or build frontend/dist first.",
+        )
+
+    requested = (dist_dir / path).resolve()
+    if requested.is_file() and requested.is_relative_to(dist_dir):
+        return FileResponse(requested)
+
+    index = dist_dir / "index.html"
+    if index.exists():
+        return FileResponse(index)
+    raise HTTPException(status_code=404, detail="Frontend index.html not found.")
+
+
 def discover_images(images_dir: Path) -> list[Path]:
     return sorted(
         [
@@ -324,6 +364,10 @@ def create_depth_mesh(
     output_path.write_bytes(exported)
 
 
+def build_frontend() -> None:
+    subprocess.run(["pnpm", "--dir", "frontend", "build"], cwd=REPO_ROOT, check=True)
+
+
 def main() -> None:
     args = parse_args()
     if args.images_dir is not None:
@@ -336,6 +380,11 @@ def main() -> None:
         os.environ["GALLERY_DA3_DEVICE"] = args.device
     if args.dev_depth_fallback:
         os.environ["GALLERY_DEV_DEPTH_FALLBACK"] = "1"
+    os.environ["GALLERY_FRONTEND_DIST"] = str(args.frontend_dist.expanduser().resolve())
+    if args.no_frontend:
+        os.environ["GALLERY_NO_FRONTEND"] = "1"
+    if args.build_frontend:
+        build_frontend()
 
     import uvicorn
 
